@@ -14,38 +14,6 @@ const uint32_t PIN_ADC_2 = 28;
 const uint32_t PIN_ADC_1 = 27;
 const uint32_t PIN_ADC_0 = 26;
 
-// LCD constants
-// See https://github.com/tsrrocha/lcddriver/blob/master/lcd/lcd16x4/lcd16x4.c
-const uint8_t LCD_CLEAR_DISPLAY = 0x01;
-const uint8_t LCD_RETURN_HOME = 0x02;
-const uint8_t LCD_ENTRY_MODE_SET = 0x04;
-const uint8_t LCD_DISPLAY_CONTROL = 0x08;
-const uint8_t LCD_CURSOR_SHIFT = 0x10;
-const uint8_t LCD_FUNCTION_SET = 0x20;
-
-const uint8_t LCD_8_BIT_MODE = 0x10;
-const uint8_t LCD_4_BIT_MODE = 0x00;
-const uint8_t LCD_2_LINE = 0x08;
-const uint8_t LCD_1_LINE = 0x00;
-const uint8_t LCD_5x10_DOTS = 0x04;
-const uint8_t LCD_5x8_DOTS = 0x00;
-
-const uint8_t LCD_BLINK_ON = 0x01;
-const uint8_t LCD_BLINK_OFF =	0x00;
-const uint8_t LCD_DISPLAY_ON = 0x04;
-const uint8_t LCD_DISPLAY_OFF = 0x00;
-const uint8_t LCD_CURSOR_ON = 0x02;
-const uint8_t LCD_CURSOR_OFF = 0x00;
-
-const uint8_t LCD_ENTRY_RIGHT = 0x00;
-const uint8_t LCD_ENTRY_LEFT = 0x02;
-const uint8_t LCD_ENTRY_SHIFT_INCREMENT = 0x01;
-const uint8_t LCD_ENTRY_SHIFT_DECREMENT = 0x00;
-const uint8_t LCD_DISPLAY_MOVE = 0x00;
-const uint8_t LCD_CURSOR_MOVE = 0x00;
-const uint8_t LCD_MOVE_RIGHT = 0x04;
-const uint8_t LCD_MOVE_LEFT = 0x00;
-
 // -- Peripheral / display pico
 const uint32_t PERIPHERAL_PIN_SEVEN_SEGMENT_A = 22;
 const uint32_t PERIPHERAL_PIN_SEVEN_SEGMENT_B = 21;

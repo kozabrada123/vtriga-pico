@@ -535,8 +535,6 @@ double Reactor::calculate_fuel_temperature_feedback_pcm() {
 
 void Reactor::tick() {
 
-  // https://github.com/ijs-f8/Research-Reactor-Simulator
-  //
   // https://www.sciencedirect.com/science/article/pii/S0306454920303285
   //
   // IJS Triga Reserach reactor simulator developer's manual:

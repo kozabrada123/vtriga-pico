@@ -486,7 +486,7 @@ int main() {
 
     // Check digital GPIO inputs
     // Note: these are inverted, since we pull them up
-    if (gpio_get(MAIN_PIN_SCRAM_BUTTON) == false) {
+    if (gpio_get(MAIN_PIN_SCRAM_BUTTON) == false && !reactor->get_in_scram()) {
       reactor->scram();
     }
 
