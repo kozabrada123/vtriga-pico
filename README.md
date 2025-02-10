@@ -27,7 +27,7 @@ B - driving the LCD and other I/O is not fast enough to run inbetween simulation
 Apart from the two [picos](https://www.reichelt.com/si/en/shop/product/raspberry_pi_pico_2_rp235x_cortex-m33_microusb-383358), other electronics include
 
 - [11 7-segment displays (6 for power, 2 for water temperature, 3 for fuel temperature)](https://www.reichelt.com/de/en/shop/product/7-segment_display_red_14_2_mm_according_to_cathode-54120#closemodal),
-- [a 4x20 LCD character display, used to display the neutron count, reactivity and rod positions],
+- [a 4x20 LCD character display, used to display the neutron count, reactivity and rod positions](https://www.reichelt.com/de/en/shop/product/4x20_dip_character_display_black_white-348142),
 - [three 100 mm travel sliding potentiometers, which are used to control the control rod positions](https://www.reichelt.com/de/en/shop/product/alps_high-quality_sliding_potentiometer_linear_stereo_10k-73873),
 - [a big SCRAM button](https://www.reichelt.com/si/en/shop/product/arcade_button_red-317435),
 - [three toggle switches (automatic / manual control, active cooling system on / off and SCRAMs on / off)](https://www.reichelt.com/de/en/shop/product/miniature_toggle_switch_on-off_3_a_125_v-359360),
