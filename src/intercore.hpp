@@ -8,6 +8,7 @@ public:
   // Main core writes, secondary core reads
   double neutrons_in_core = 0;
   int16_t reactivity_pcm = 0;
+  double power_watts = 0;
 
   uint32_t safety_rod_current_position = 0;
   uint32_t regulating_rod_current_position = 0;

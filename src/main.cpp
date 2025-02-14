@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <format>
 #include <hardware/regs/io_bank0.h>
+#include <hardware/structs/io_bank0.h>
 #include <hardware/uart.h>
 #include <pico/mutex.h>
 #include <pico/time.h>
@@ -125,7 +126,7 @@ int main() {
       }
     }
 
-	 std::string formatted_fuel_t = std::to_string(fuel_temperature_celcius);
+    std::string formatted_fuel_t = std::to_string(fuel_temperature_celcius);
 
     uint8_t length = (uint8_t)formatted_fuel_t.length();
     uint8_t digit = (uint8_t)formatted_fuel_t[length - 1] & 0x0F;
@@ -156,7 +157,7 @@ int main() {
       fuel_t_digit_100.deselect();
     }
 
-	 std::string formatted_water_t = std::to_string(water_temperature_celcius);
+    std::string formatted_water_t = std::to_string(water_temperature_celcius);
 
     length = (uint8_t)formatted_water_t.length();
     digit = (uint8_t)formatted_water_t[length - 1] & 0x0F;
@@ -246,19 +247,12 @@ int main() {
 
 /// Sets how bright the cherenkov leds should be.
 ///
-/// The arguments should be between 0 and 65535, where 0 is totally off and
-/// 65535 is totally on
+/// The arguments should be between 0 and 1000, where 0 is totally off and
+/// 1000 is totally on
 void set_cherenkov_on_percentage(uint16_t slice_of_max) {
-
-  // A duty cycle of 100% -> 3.3 V
-  //
-  // The cherenkov leds open at 2.8 V, 3 V and 3.5 V ??
-  //
-  // Todo: this can't be right, but what do we do?
 
   uint slice_num = pwm_gpio_to_slice_num(MAIN_PIN_CHERENKOV_LED);
   pwm_set_chan_level(slice_num, PWM_CHAN_A, slice_of_max);
-  pwm_set_enabled(slice_num, true);
 }
 
 /// Main for core 2 of the simulator pico
@@ -270,13 +264,14 @@ void main_core_2() {
   adc_gpio_init(MAIN_PIN_COMPENSATING_ROD_INPUT);
 
   // Wait for lcd to wake
-  sleep_ms(40);
+  sleep_ms(60);
 
   auto *lcd = new LcdDisplay();
   lcd->setup_lcd();
 
   double neutrons_in_core = 0;
   int16_t reactivity_pcm = 0;
+  double power_watts = 0;
 
   uint32_t safety_rod_current_position = 0;
   uint32_t regulating_rod_current_position = 0;
@@ -292,11 +287,11 @@ void main_core_2() {
   while (1) {
 
     auto current_time = get_absolute_time();
-    auto next_loop_time = delayed_by_ms(current_time, 5);
+    auto next_loop_time = delayed_by_ms(current_time, 20);
 
     // Check if we need to use ADCs
     // 1 - automatic, since we're using pull up resistors
-    use_adc = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+    use_adc = !gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
 
     // Use ADCs to evaluate potentiometers
     if (use_adc) {
@@ -310,11 +305,11 @@ void main_core_2() {
       uint16_t compensating_rod_result = adc_read();
 
       safety_rod_target_position =
-          safety_rod_result * ((4000000) / (2 ^ 12 - 1));
+          4000000 - (safety_rod_result * ((4000000) / ((2 << 11) - 1)));
       regulating_rod_target_position =
-          regulating_rod_result * ((4000000) / (2 ^ 12 - 1));
+          4000000 - (regulating_rod_result * ((4000000) / ((2 << 11) - 1)));
       compensating_rod_target_position =
-          compensating_rod_result * ((4000000) / (2 ^ 12 - 1));
+          4000000 - (compensating_rod_result * ((4000000) / ((2 << 11) - 1)));
     }
 
     // Communicate with the other core
@@ -322,6 +317,7 @@ void main_core_2() {
 
     neutrons_in_core = intercore_memory.neutrons_in_core;
     reactivity_pcm = intercore_memory.reactivity_pcm;
+    power_watts = intercore_memory.power_watts;
 
     safety_rod_current_position = intercore_memory.safety_rod_current_position;
     regulating_rod_current_position =
@@ -352,49 +348,65 @@ void main_core_2() {
 
     // Display stuff on the lcd
     // First create the string buffer
-    std::string line_0 = std::format("n0 : {:.2g}", neutrons_in_core);
+    /*std::string line_0 = std::format("n0 : {:.2g}", neutrons_in_core);
+    line_0.resize(20, ' ');*/
+
+    std::string line_0 = std::format("pow: {:.2f} W", power_watts);
+
+    if (power_watts > 10) {
+      line_0 = std::format("pow: {:.0f} W", power_watts);
+    }
+
     line_0.resize(20, ' ');
 
     // Get the target and current positions in the range of 0 - 999
     uint16_t safety_target_0_to_999 =
         safety_rod_target_position / (4000000 / 1000);
-    std::clamp(safety_target_0_to_999, (uint16_t)0, (uint16_t)999);
+    safety_target_0_to_999 =
+        std::clamp(safety_target_0_to_999, (uint16_t)0, (uint16_t)999);
 
     uint16_t regulating_target_0_to_999 =
         regulating_rod_target_position / (4000000 / 1000);
-    std::clamp(regulating_target_0_to_999, (uint16_t)0, (uint16_t)999);
+    regulating_target_0_to_999 =
+        std::clamp(regulating_target_0_to_999, (uint16_t)0, (uint16_t)999);
 
     uint16_t compensating_target_0_to_999 =
         compensating_rod_target_position / (4000000 / 1000);
-    std::clamp(compensating_target_0_to_999, (uint16_t)0, (uint16_t)999);
+    compensating_target_0_to_999 =
+        std::clamp(compensating_target_0_to_999, (uint16_t)0, (uint16_t)999);
 
     uint16_t safety_current_0_to_999 =
         safety_rod_current_position / (4000000 / 1000);
-    std::clamp(safety_current_0_to_999, (uint16_t)0, (uint16_t)999);
+    safety_current_0_to_999 =
+        std::clamp(safety_current_0_to_999, (uint16_t)0, (uint16_t)999);
 
     uint16_t regulating_current_0_to_999 =
         regulating_rod_current_position / (4000000 / 1000);
-    std::clamp(regulating_current_0_to_999, (uint16_t)0, (uint16_t)999);
+    regulating_current_0_to_999 =
+        std::clamp(regulating_current_0_to_999, (uint16_t)0, (uint16_t)999);
 
     uint16_t compensating_current_0_to_999 =
         compensating_rod_current_position / (4000000 / 1000);
-    std::clamp(compensating_current_0_to_999, (uint16_t)0, (uint16_t)999);
+    compensating_current_0_to_999 =
+        std::clamp(compensating_current_0_to_999, (uint16_t)0, (uint16_t)999);
 
     std::string line_1 =
         std::format("tgt: {:-03d} {:-03d} {:-03d}", safety_target_0_to_999,
                     regulating_target_0_to_999, compensating_target_0_to_999);
-    line_0.resize(20, ' ');
+    line_1.resize(20, ' ');
 
     std::string line_2 =
         std::format("pos: {:-03d} {:-03d} {:-03d}", safety_current_0_to_999,
                     regulating_current_0_to_999, compensating_current_0_to_999);
-    line_0.resize(20, ' ');
+    line_2.resize(20, ' ');
 
-    std::string line_3 = std::format("rho: {:+d}", reactivity_pcm);
-    line_0.resize(20, ' ');
+    std::string line_3 = std::format("rho: {:+d} pcm", reactivity_pcm);
+    line_3.resize(20, ' ');
 
     // Write to the lcd
     lcd->clear_display();
+
+    lcd->set_register_select(true);
 
     for (int i = 0; i < 20; i++) {
       lcd->write_to_lcd(line_0[i]);
@@ -408,6 +420,8 @@ void main_core_2() {
     for (int i = 0; i < 20; i++) {
       lcd->write_to_lcd(line_3[i]);
     }
+
+    lcd->set_register_select(false);
 
     sleep_until(next_loop_time);
   }
@@ -438,7 +452,9 @@ int main() {
   // Enable PWM
   gpio_set_function(MAIN_PIN_CHERENKOV_LED, GPIO_FUNC_PWM);
   uint slice_num = pwm_gpio_to_slice_num(MAIN_PIN_CHERENKOV_LED);
-  pwm_set_wrap(slice_num, 0xFFFF);
+  pwm_set_wrap(slice_num, 1000);
+  pwm_set_chan_level(slice_num, PWM_CHAN_A, 1);
+  pwm_set_enabled(slice_num, true);
 
   // Enable UART
   gpio_set_function(MAIN_PIN_UART_TX, UART_FUNCSEL_NUM(uart0, 0));
@@ -466,10 +482,10 @@ int main() {
 
     // Manage the SCRAM led
     //
-    // Pulse 1s / 1s on and off when in scram
+    // Pulse 0.5s / 0.5s on and off when in scram
     // set to off when not in scram
     if (reactor->get_in_scram()) {
-      if (reactor->get_steps_since_scram_started() % 10000 == 0) {
+      if (reactor->get_steps_since_scram_started() % 5000 == 0) {
         scram_led_on = !scram_led_on;
       }
     } else {
@@ -478,31 +494,40 @@ int main() {
 
     gpio_put(MAIN_PIN_SCRAM_LED, scram_led_on);
 
-    // Set the cherenkov led
+    // Set the cherenkov leds
     // linearly set the power with PWM from 0 to SCRAM watts
     double cherenkov_percentage =
-        reactor->get_target_thermal_power_watts() / (double)POWER_SCRAM_WATTS;
-    set_cherenkov_on_percentage((uint16_t)(cherenkov_percentage * 0xFFFF));
+        reactor->calculate_power_watts() / (double)POWER_SCRAM_WATTS;
+    set_cherenkov_on_percentage(
+        (uint16_t)(cherenkov_percentage * (double)1000));
+
+    if (reactor->get_steps_elapsed() % 10000 == 0) {
+      led_on = !led_on;
+      gpio_put(PIN_LED, led_on);
+    }
 
     // Check digital GPIO inputs
     // Note: these are inverted, since we pull them up
-    if (gpio_get(MAIN_PIN_SCRAM_BUTTON) == false && !reactor->get_in_scram()) {
+    if (!gpio_get(MAIN_PIN_SCRAM_BUTTON) && !reactor->get_in_scram()) {
       reactor->scram();
     }
 
-    reactor->scrams_enabled = !gpio_get(MAIN_PIN_ENABLE_SCRAMS_SWITCH);
+    reactor->scrams_enabled = gpio_get(MAIN_PIN_ENABLE_SCRAMS_SWITCH);
     reactor->active_cooling_system_enabled =
-        !gpio_get(MAIN_PIN_ACTIVE_COOLING_SWITCH);
-    reactor->automatic_control =
-        !gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+        gpio_get(MAIN_PIN_ACTIVE_COOLING_SWITCH);
 
-    // Send to UART
-    if (reactor->get_steps_elapsed() % 100 == 0) {
+    bool automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
 
-      if (reactor->get_steps_elapsed() % 10000 == 0) {
-        led_on = !led_on;
-        gpio_put(PIN_LED, led_on);
-      }
+    if (automatic_control && !reactor->automatic_control) {
+      reactor->get_safety_control_rod()->set_target_position(0);
+      reactor->get_regulating_control_rod()->set_target_position(24e5);
+      reactor->get_compensating_control_rod()->set_target_position(0);
+    }
+
+	 reactor->automatic_control = automatic_control;
+
+    // 20x per second, send to UART
+    if (reactor->get_steps_elapsed() % 200 == 0) {
 
       uint32_t thermal_power_watts = (uint32_t)reactor->calculate_power_watts();
 
@@ -528,6 +553,7 @@ int main() {
 
     intercore_memory.neutrons_in_core = reactor->get_neutrons_in_core();
     intercore_memory.reactivity_pcm = (uint16_t)(reactor->get_reactivity_pcm());
+    intercore_memory.power_watts = reactor->calculate_power_watts();
 
     intercore_memory.safety_rod_current_position =
         reactor->get_safety_control_rod()->get_current_position();

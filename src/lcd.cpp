@@ -79,12 +79,15 @@ void LcdDisplay::write_to_lcd(uint8_t data) {
 }
 
 void LcdDisplay::setup_lcd() {
+  set_register_select(false);
   send_to_lcd(0b00110100);
-  sleep_us(39);
-  set_display_extended_functions(true, false, true);
-  set_display_function(true);
-  return_home();
-  set_display_flags(true, false, false);
-  set_entry_mode(true, false);
-  set_display_function(true);
+  sleep_ms(1);
+  send_to_lcd(0b00001001);
+  sleep_ms(1);
+  send_to_lcd(0b00110000);
+  sleep_ms(1);
+  send_to_lcd(0b00001110);
+  sleep_ms(1);
+  clear_display();
+  send_to_lcd(0b00000110);
 }

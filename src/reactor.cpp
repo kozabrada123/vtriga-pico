@@ -6,19 +6,20 @@
 #include <cstdint>
 
 Reactor::Reactor() {
-  safety_control_rod = ControlRod(4e6);
+	// Note: change back to 4e6 at some point
+  safety_control_rod = ControlRod(0);
   safety_control_rod.set_speed_steps_per_second(SAFETY_ROD_SPEED_PER_SECOND);
-  safety_control_rod.set_target_position(4e6);
+  safety_control_rod.set_target_position(0);
 
-  regulating_control_rod = ControlRod(4e6);
+  regulating_control_rod = ControlRod(24e5);
   regulating_control_rod.set_speed_steps_per_second(
       REGULATING_ROD_SPEED_PER_SECOND);
-  regulating_control_rod.set_target_position(4e6);
+  regulating_control_rod.set_target_position(24e5);
 
-  compensating_control_rod = ControlRod(4e6);
+  compensating_control_rod = ControlRod(0);
   compensating_control_rod.set_speed_steps_per_second(
       COMPENSATING_ROD_SPEED_PER_SECOND);
-  regulating_control_rod.set_target_position(4e6);
+  regulating_control_rod.set_target_position(0);
 }
 
 
