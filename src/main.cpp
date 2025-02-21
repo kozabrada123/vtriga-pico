@@ -291,7 +291,9 @@ void main_core_2() {
 
     // Check if we need to use ADCs
     // 1 - automatic, since we're using pull up resistors
-    use_adc = !gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+	 bool automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+
+    use_adc = !automatic_control && !in_scram;
 
     // Use ADCs to evaluate potentiometers
     if (use_adc) {
@@ -351,10 +353,10 @@ void main_core_2() {
     /*std::string line_0 = std::format("n0 : {:.2g}", neutrons_in_core);
     line_0.resize(20, ' ');*/
 
-    std::string line_0 = std::format("pow: {:.2f} W", power_watts);
+    std::string line_0 = std::format("n0: {:.2f}", neutrons_in_core);
 
-    if (power_watts > 10) {
-      line_0 = std::format("pow: {:.0f} W", power_watts);
+    if (neutrons_in_core > 100) {
+      line_0 = std::format("n0: {:.3g}", neutrons_in_core);
     }
 
     line_0.resize(20, ' ');
@@ -393,6 +395,11 @@ void main_core_2() {
     std::string line_1 =
         std::format("tgt: {:-03d} {:-03d} {:-03d}", safety_target_0_to_999,
                     regulating_target_0_to_999, compensating_target_0_to_999);
+
+	 if (in_scram) {
+		line_1 = std::format("tgt: -- IN SCRAM --");
+	 }
+
     line_1.resize(20, ' ');
 
     std::string line_2 =
@@ -516,15 +523,15 @@ int main() {
     reactor->active_cooling_system_enabled =
         gpio_get(MAIN_PIN_ACTIVE_COOLING_SWITCH);
 
-    bool automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+    bool new_automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
 
-    if (automatic_control && !reactor->automatic_control) {
+    if (new_automatic_control && !reactor->automatic_control && !reactor->get_in_scram()) {
       reactor->get_safety_control_rod()->set_target_position(0);
       reactor->get_regulating_control_rod()->set_target_position(24e5);
       reactor->get_compensating_control_rod()->set_target_position(0);
     }
 
-	 reactor->automatic_control = automatic_control;
+	 reactor->automatic_control = new_automatic_control;
 
     // 20x per second, send to UART
     if (reactor->get_steps_elapsed() % 200 == 0) {
@@ -552,7 +559,7 @@ int main() {
     mutex_enter_blocking(&intercore_memory.reactor_data_mutex);
 
     intercore_memory.neutrons_in_core = reactor->get_neutrons_in_core();
-    intercore_memory.reactivity_pcm = (uint16_t)(reactor->get_reactivity_pcm());
+    intercore_memory.reactivity_pcm = (int16_t)(reactor->get_reactivity_pcm());
     intercore_memory.power_watts = reactor->calculate_power_watts();
 
     intercore_memory.safety_rod_current_position =
@@ -567,7 +574,7 @@ int main() {
     mutex_exit(&intercore_memory.reactor_data_mutex);
 
     mutex_enter_blocking(&intercore_memory.rod_target_positions_mutex);
-    if (!reactor->automatic_control) {
+    if (!reactor->automatic_control && !reactor->get_in_scram()) {
       reactor->get_safety_control_rod()->set_target_position(
           intercore_memory.safety_rod_target_position);
       reactor->get_regulating_control_rod()->set_target_position(
