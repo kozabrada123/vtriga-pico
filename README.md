@@ -2,7 +2,7 @@
 
 This was created for a school project;
 
-it features a 1:8 scale 3D printed model of the research reactor with a control panel (both designed / modeled by my friend, with whom we created this whole project), powered by a computer simulation running on 1 core of a Raspberry Pi Pico 2 microcontroller.
+it features a 1:9 scale 3D printed model of the research reactor with a control panel (both designed / modeled by my friend, with whom we created this whole project), powered by a computer simulation running on 1 core of a Raspberry Pi Pico 2 microcontroller.
 
 ### 3D printed model
 
