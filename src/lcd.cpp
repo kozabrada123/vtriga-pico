@@ -86,7 +86,7 @@ void LcdDisplay::setup_lcd() {
   sleep_ms(1);
   send_to_lcd(0b00110000);
   sleep_ms(1);
-  send_to_lcd(0b00001110);
+  send_to_lcd(0b00001100);
   sleep_ms(1);
   clear_display();
   send_to_lcd(0b00000110);

@@ -20,6 +20,7 @@ file(GLOB vtriga_SRC
 	"src/lcd.cpp"
 	"src/lcd.hpp"
 	"src/intercore.cpp"
+	"src/average_value.hpp"
 )
 
 add_executable(vtriga

@@ -1,3 +1,4 @@
+#include "average_value.hpp"
 #include "constants.hpp"
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
@@ -132,14 +133,14 @@ int main() {
     uint8_t digit = (uint8_t)formatted_fuel_t[length - 1] & 0x0F;
 
     fuel_t_digit_1.safe_print_digit(digit);
-    sleep_us(100);
+    sleep_us(150);
     fuel_t_digit_1.deselect();
 
     if (length >= 2) {
       digit = (uint8_t)formatted_fuel_t[length - 2] & 0x0F;
 
       fuel_t_digit_10.safe_print_digit(digit);
-      sleep_us(100);
+      sleep_us(150);
       fuel_t_digit_10.deselect();
     } else {
       fuel_t_digit_10.print_bits(0);
@@ -150,7 +151,7 @@ int main() {
       digit = (uint8_t)formatted_fuel_t[length - 3] & 0x0F;
 
       fuel_t_digit_100.safe_print_digit(digit);
-      sleep_us(100);
+      sleep_us(150);
       fuel_t_digit_100.deselect();
     } else {
       fuel_t_digit_100.print_bits(0);
@@ -269,6 +270,13 @@ void main_core_2() {
   auto *lcd = new LcdDisplay();
   lcd->setup_lcd();
 
+  /// Number of milliseconds to wait inbetween ADC loops
+  const auto one_loop_us = 200;
+  /// Number of milliseconds to wait inbetween LCD updates
+  const auto one_lcd_update_ms = 100;
+
+  absolute_time_t last_lcd_update = nil_time;
+
   double neutrons_in_core = 0;
   int16_t reactivity_pcm = 0;
   double power_watts = 0;
@@ -281,37 +289,37 @@ void main_core_2() {
   uint32_t regulating_rod_target_position = 0;
   uint32_t compensating_rod_target_position = 0;
 
+  AverageValue safety_rod_adc_result = {};
+  AverageValue regulating_rod_adc_result = {};
+  AverageValue compensating_rod_adc_result = {};
+
   bool in_scram = false;
   bool use_adc = true;
 
   while (1) {
 
     auto current_time = get_absolute_time();
-    auto next_loop_time = delayed_by_ms(current_time, 20);
+    auto next_loop_time = delayed_by_us(current_time, one_loop_us);
 
     // Check if we need to use ADCs
     // 1 - automatic, since we're using pull up resistors
-	 bool automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+    bool automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
 
     use_adc = !automatic_control && !in_scram;
 
     // Use ADCs to evaluate potentiometers
     if (use_adc) {
       adc_select_input(MAIN_PIN_SAFETY_ROD_INPUT - 26);
-      uint16_t safety_rod_result = adc_read();
+      safety_rod_adc_result.add_measurement(adc_read());
+		safety_rod_target_position = safety_rod_adc_result.get_value_as_rod_position();
 
       adc_select_input(MAIN_PIN_REGULATING_ROD_INPUT - 26);
-      uint16_t regulating_rod_result = adc_read();
+      regulating_rod_adc_result.add_measurement(adc_read());
+		regulating_rod_target_position = regulating_rod_adc_result.get_value_as_rod_position();
 
       adc_select_input(MAIN_PIN_COMPENSATING_ROD_INPUT - 26);
-      uint16_t compensating_rod_result = adc_read();
-
-      safety_rod_target_position =
-          4000000 - (safety_rod_result * ((4000000) / ((2 << 11) - 1)));
-      regulating_rod_target_position =
-          4000000 - (regulating_rod_result * ((4000000) / ((2 << 11) - 1)));
-      compensating_rod_target_position =
-          4000000 - (compensating_rod_result * ((4000000) / ((2 << 11) - 1)));
+      compensating_rod_adc_result.add_measurement(adc_read());
+		compensating_rod_target_position = compensating_rod_adc_result.get_value_as_rod_position();
     }
 
     // Communicate with the other core
@@ -349,86 +357,94 @@ void main_core_2() {
     mutex_exit(&intercore_memory.rod_target_positions_mutex);
 
     // Display stuff on the lcd
-    // First create the string buffer
-    /*std::string line_0 = std::format("n0 : {:.2g}", neutrons_in_core);
-    line_0.resize(20, ' ');*/
+    bool update_lcd =
+        absolute_time_diff_us(delayed_by_ms(last_lcd_update, one_lcd_update_ms),
+                              current_time) > 0;
+    if (update_lcd) {
 
-    std::string line_0 = std::format("n0: {:.2f}", neutrons_in_core);
+      last_lcd_update = current_time;
 
-    if (neutrons_in_core > 100) {
-      line_0 = std::format("n0: {:.3g}", neutrons_in_core);
-    }
+      std::string line_0 = std::format("n0 : {:05.2f}", neutrons_in_core);
 
-    line_0.resize(20, ' ');
+      if (neutrons_in_core >= 1000) {
+        line_0 = std::format("n0 : {:.2e}", neutrons_in_core);
+      } else if (neutrons_in_core >= 100) {
+        line_0 = std::format("n0 : {:.1f}", neutrons_in_core);
+      }
 
-    // Get the target and current positions in the range of 0 - 999
-    uint16_t safety_target_0_to_999 =
-        safety_rod_target_position / (4000000 / 1000);
-    safety_target_0_to_999 =
-        std::clamp(safety_target_0_to_999, (uint16_t)0, (uint16_t)999);
+      line_0.resize(20, ' ');
 
-    uint16_t regulating_target_0_to_999 =
-        regulating_rod_target_position / (4000000 / 1000);
-    regulating_target_0_to_999 =
-        std::clamp(regulating_target_0_to_999, (uint16_t)0, (uint16_t)999);
+      // Get the target and current positions in the range of 0 - 999
+      uint16_t safety_target_0_to_999 =
+          safety_rod_target_position / (4000000 / 1000);
+      safety_target_0_to_999 =
+          std::clamp(safety_target_0_to_999, (uint16_t)0, (uint16_t)999);
 
-    uint16_t compensating_target_0_to_999 =
-        compensating_rod_target_position / (4000000 / 1000);
-    compensating_target_0_to_999 =
-        std::clamp(compensating_target_0_to_999, (uint16_t)0, (uint16_t)999);
+      uint16_t regulating_target_0_to_999 =
+          regulating_rod_target_position / (4000000 / 1000);
+      regulating_target_0_to_999 =
+          std::clamp(regulating_target_0_to_999, (uint16_t)0, (uint16_t)999);
 
-    uint16_t safety_current_0_to_999 =
-        safety_rod_current_position / (4000000 / 1000);
-    safety_current_0_to_999 =
-        std::clamp(safety_current_0_to_999, (uint16_t)0, (uint16_t)999);
+      uint16_t compensating_target_0_to_999 =
+          compensating_rod_target_position / (4000000 / 1000);
+      compensating_target_0_to_999 =
+          std::clamp(compensating_target_0_to_999, (uint16_t)0, (uint16_t)999);
 
-    uint16_t regulating_current_0_to_999 =
-        regulating_rod_current_position / (4000000 / 1000);
-    regulating_current_0_to_999 =
-        std::clamp(regulating_current_0_to_999, (uint16_t)0, (uint16_t)999);
+      uint16_t safety_current_0_to_999 =
+          safety_rod_current_position / (4000000 / 1000);
+      safety_current_0_to_999 =
+          std::clamp(safety_current_0_to_999, (uint16_t)0, (uint16_t)999);
 
-    uint16_t compensating_current_0_to_999 =
-        compensating_rod_current_position / (4000000 / 1000);
-    compensating_current_0_to_999 =
-        std::clamp(compensating_current_0_to_999, (uint16_t)0, (uint16_t)999);
+      uint16_t regulating_current_0_to_999 =
+          regulating_rod_current_position / (4000000 / 1000);
+      regulating_current_0_to_999 =
+          std::clamp(regulating_current_0_to_999, (uint16_t)0, (uint16_t)999);
 
-    std::string line_1 =
+      uint16_t compensating_current_0_to_999 =
+          compensating_rod_current_position / (4000000 / 1000);
+      compensating_current_0_to_999 =
+          std::clamp(compensating_current_0_to_999, (uint16_t)0, (uint16_t)999);
+
+      std::string line_1 =
         std::format("tgt: {:-03d} {:-03d} {:-03d}", safety_target_0_to_999,
-                    regulating_target_0_to_999, compensating_target_0_to_999);
+        regulating_target_0_to_999,
+        compensating_target_0_to_999);
 
-	 if (in_scram) {
-		line_1 = std::format("tgt: -- IN SCRAM --");
-	 }
+      if (in_scram) {
+        line_1 = std::format("tgt: -- IN SCRAM --");
+      }
 
-    line_1.resize(20, ' ');
+      line_1.resize(20, ' ');
 
-    std::string line_2 =
-        std::format("pos: {:-03d} {:-03d} {:-03d}", safety_current_0_to_999,
-                    regulating_current_0_to_999, compensating_current_0_to_999);
-    line_2.resize(20, ' ');
+      std::string line_2 = std::format(
+          "pos: {:-03d} {:-03d} {:-03d}", safety_current_0_to_999,
+          regulating_current_0_to_999, compensating_current_0_to_999);
 
-    std::string line_3 = std::format("rho: {:+d} pcm", reactivity_pcm);
-    line_3.resize(20, ' ');
+      line_2.resize(20, ' ');
 
-    // Write to the lcd
-    lcd->clear_display();
+      std::string line_3 = std::format("rho: {:+d} pcm", reactivity_pcm);
+      line_3.resize(20, ' ');
 
-    lcd->set_register_select(true);
+      // Write to the lcd
+      lcd->clear_display();
 
-    for (int i = 0; i < 20; i++) {
-      lcd->write_to_lcd(line_0[i]);
+      lcd->set_register_select(true);
+
+      for (int i = 0; i < 20; i++) {
+        lcd->write_to_lcd(line_0[i]);
+      }
+      for (int i = 0; i < 20; i++) {
+        lcd->write_to_lcd(line_1[i]);
+      }
+      for (int i = 0; i < 20; i++) {
+        lcd->write_to_lcd(line_2[i]);
+      }
+      for (int i = 0; i < 20; i++) {
+        lcd->write_to_lcd(line_3[i]);
+      }
+
+      lcd->set_register_select(false);
     }
-    for (int i = 0; i < 20; i++) {
-      lcd->write_to_lcd(line_1[i]);
-    }
-    for (int i = 0; i < 20; i++) {
-      lcd->write_to_lcd(line_2[i]);
-    }
-    for (int i = 0; i < 20; i++) {
-      lcd->write_to_lcd(line_3[i]);
-    }
-
-    lcd->set_register_select(false);
 
     sleep_until(next_loop_time);
   }
@@ -440,8 +456,11 @@ void main_core_2() {
 int main() {
 
   // Initialize all gpio pins we'll be using
-  gpio_init_mask(0b11111001100111111111000);
-  gpio_set_dir_masked(0b11111001100111111111000, 0b00001001100111111111000);
+  gpio_init_mask(0b111111001100111111111000);
+  gpio_set_dir_masked(0b111111001100111111111000, 0b100001001100111111111000);
+
+  // Set GPIO 23 to high to reduce ADC noise
+  gpio_put(23, true);
 
   // Enable pull downs and pull ups on our input switches and button
   gpio_pull_up(MAIN_PIN_ACTIVE_COOLING_SWITCH);
@@ -523,20 +542,23 @@ int main() {
     reactor->active_cooling_system_enabled =
         gpio_get(MAIN_PIN_ACTIVE_COOLING_SWITCH);
 
-    bool new_automatic_control = gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
+    bool new_automatic_control =
+        gpio_get(MAIN_PIN_MANUAL_AUTOMATIC_CONTROL_SWITCH);
 
-    if (new_automatic_control && !reactor->automatic_control && !reactor->get_in_scram()) {
+    if (new_automatic_control && !reactor->automatic_control &&
+        !reactor->get_in_scram()) {
       reactor->get_safety_control_rod()->set_target_position(0);
       reactor->get_regulating_control_rod()->set_target_position(24e5);
       reactor->get_compensating_control_rod()->set_target_position(0);
     }
 
-	 reactor->automatic_control = new_automatic_control;
+    reactor->automatic_control = new_automatic_control;
 
-    // 20x per second, send to UART
-    if (reactor->get_steps_elapsed() % 200 == 0) {
+    // 10x per second, send to UART
+    if (reactor->get_steps_elapsed() % 100 == 0) {
 
       uint32_t thermal_power_watts = (uint32_t)reactor->calculate_power_watts();
+		thermal_power_watts = std::clamp<uint32_t>(thermal_power_watts, 0, 999999);
 
       uart_putc(uart0, (char)(OPCODE_UPDATE_POWER));
 
@@ -546,13 +568,16 @@ int main() {
       uart_putc(uart0, (char)(uint8_t)(thermal_power_watts & 0xFF));
 
       uint16_t fuel_T = (uint16_t)reactor->get_fuel_temperature_celcius();
+	   fuel_T = std::clamp<uint16_t>(fuel_T, 0, 999);
+
       uint8_t water_T = (uint8_t)reactor->get_water_temperature_celcius();
+		water_T = std::clamp<uint8_t>(water_T, 0, 99);
 
       uart_putc(uart0, (char)OPCODE_UPDATE_TEMPERATURES);
 
       uart_putc(uart0, (char)(fuel_T >> 8));
-      uart_putc(uart0, (char)((fuel_T) & 0xFF));
-      uart_putc(uart0, (char)(fuel_T));
+      uart_putc(uart0, (char)(fuel_T & 0xFF));
+      uart_putc(uart0, (char)(water_T));
     }
 
     // Communicate with the other core

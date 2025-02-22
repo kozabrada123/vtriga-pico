@@ -176,6 +176,6 @@ protected:
   ControlRod compensating_control_rod;
 
   // RCS information
-  uint32_t target_thermal_power_watts = 20e3;
+  uint32_t target_thermal_power_watts = 20001;
 };
 #endif
