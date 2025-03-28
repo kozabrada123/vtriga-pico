@@ -1,22 +1,28 @@
 ## Model of a TRIGA Mark II research reactor
 
-This was created for a school project;
+![orthographic view of the model](/images/ortho.webp)
+
+![close up view of the model](/images/closeup.webp)
+
+[This was created for a secondary school competition, and ended up winning first place!](https://www.icjt.org/en/zakljucek-tehniskega-natecaja-energija-in-jedrska-tehnologija/)
 
 it features a 1:9 scale 3D printed model of the research reactor with a control panel (both designed / modeled by my friend, with whom we created this whole project), powered by a computer simulation running on 1 core of a Raspberry Pi Pico 2 microcontroller.
 
 ### 3D printed model
 
-I won't speak much about the model, since it wasn't my work, but overall it was composed of about 38 different pieces of three different colors.
+I won't speak much about the model, since it wasn't my work, but overall it was composed of about 36 different pieces (25 large ones, 20 smaller ones and 46 fuel elements) of three different colors.
 
-I think we used about 8 kg of plastic (of only the main color)!
+We used about 10 kg of plastic (around 200 euro) with the total print time exceeding 148 hours; we had to print 10 - 14 hours every day for about two weeks to get this done
 
-We printed 10 - 14 hours every day for about two weeks to get this done.
+(In the end we also enlisted some help from our high school's 3D printers, as we wouldn't have everything printed on time otherwise.)
 
-(In the end we also enlisted some help from the school's 3D printers, as we wouldn't have everything printed on time otherwise.)
+Apart from the entire design and assembly process, my friend also painted the huge model in RAL 6019 for the reactor's signature pastel green color.
+
+The finishing touch was to add cherenkov radiation LEDs to the reactor's core.
 
 ### Electronics
 
-Even though the model runs on a single core, three cores are used along two RPI Picos (connected via UART).
+Even though the model runs on a single core, three cores are used along two RPI Pico 2s (connected via UART).
 
 This is because:
 
@@ -37,9 +43,11 @@ Apart from the two [picos](https://www.reichelt.com/si/en/shop/product/raspberry
 
 ### Simulation
 
-The simulation is based off a [paper from the Jožef Stefan Institude in Ljubljana](https://www.sciencedirect.com/science/article/pii/S0306454920303285#t0005) about a PC simulator.
+The simulation is based off a [paper from the Jožef Stefan Institude in Ljubljana (the same amazing people who created the competition)](https://www.sciencedirect.com/science/article/pii/S0306454920303285#t0005) about a PC simulator.
 
 This pico based model uses their math and very small part of [their code](https://github.com/ijs-f8/Research-Reactor-Simulator), which was optimized to run in real time.
+
+It evaluates the differential equations using a forward euler method, with a timestep of 0.1 ms.
 
 It is not created to model Xenon poisoning or pulse operations of the reactor.
 
