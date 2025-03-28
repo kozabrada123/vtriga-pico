@@ -523,7 +523,7 @@ int main() {
     // Set the cherenkov leds
     // linearly set the power with PWM from 0 to SCRAM watts
     double cherenkov_percentage =
-        reactor->calculate_power_watts() / (double)POWER_SCRAM_WATTS;
+        reactor->calculate_power_watts() / (double)reactor->get_target_thermal_power_watts();
     set_cherenkov_on_percentage(
         (uint16_t)(cherenkov_percentage * (double)1000));
 

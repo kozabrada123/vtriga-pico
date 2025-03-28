@@ -1,0 +1,13 @@
+
+Maketa TRIGA MARK II reaktorja
+
+Maketa raziskovalnega jederskega reaktorja TRIGA MARK II je izdelana v razmerju 1:9 - visoka je 65 cm, široka 70 cm in globoka 27 cm.
+Vključuje tudi LED diode, ki prikazujejo Čerenkovo sevanje.
+
+Te poganja simulacija na mikrokrmilniku, ki se nahaja v priloženem primeru kontrolne plošče.
+
+Na le-tej lahko nadzorujemo stanje reaktorja (temperaturo goriva, vode, toplotno moč in št. nevtronov) ter krmilimo s tremi kontrolnimi palicami.
+
+Mentor: prof. Andrej Guštin
+Avtorja izdelka: Vid Horvat in Natan Jurca
+
